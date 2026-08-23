@@ -18,6 +18,7 @@ from utils.data_helpers import (
     limpiar_columnas_numericas,
     normalizar_fechas,
     formato_moneda,
+    formato_clp,
     formato_porcentaje,
     formato_miles,
     formatear_dataframe,
@@ -32,7 +33,7 @@ from utils.data_helpers import (
     conciliar_tablas,
 )
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 __all__ = [
     "TableManager",
@@ -54,6 +55,7 @@ __all__ = [
     "limpiar_columnas_numericas",
     "normalizar_fechas",
     "formato_moneda",
+    "formato_clp",
     "formato_porcentaje",
     "formato_miles",
     "formatear_dataframe",

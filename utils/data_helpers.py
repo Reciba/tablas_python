@@ -146,6 +146,18 @@ def formato_moneda(val: Any, simbolo: str = "$", decimales: int = 0, separador_m
     return f"{simbolo} {texto}" if simbolo else texto
 
 
+def formato_clp(val: Any, simbolo: str = "$") -> str:
+    """
+    Formatea un número o texto a Pesos Chilenos (CLP) con separador de miles y sin decimales.
+    
+    Ejemplos:
+        formato_clp(1500000)              -> "$ 1.500.000"
+        formato_clp("1500000")            -> "$ 1.500.000"
+        formato_clp(250000, simbolo="CLP") -> "CLP 250.000"
+    """
+    return formato_moneda(val, simbolo=simbolo, decimales=0, separador_miles=".")
+
+
 def formato_porcentaje(
     val: Any,
     decimales: Optional[int] = None,
@@ -224,10 +236,14 @@ def formatear_dataframe(
     for col, tipo in reglas.items():
         if col not in df_out.columns:
             continue
-        if tipo == 'moneda':
-            df_out[col] = df_out[col].apply(lambda x: formato_moneda(x, decimales=0))
+        if tipo in ['moneda', 'clp', 'moneda_clp']:
+            df_out[col] = df_out[col].apply(lambda x: formato_clp(x))
         elif tipo == 'moneda_2dec':
             df_out[col] = df_out[col].apply(lambda x: formato_moneda(x, decimales=2))
+        elif tipo == 'usd':
+            df_out[col] = df_out[col].apply(lambda x: formato_moneda(x, simbolo="USD $", decimales=2, separador_miles=","))
+        elif tipo == 'uf':
+            df_out[col] = df_out[col].apply(lambda x: formato_moneda(x, simbolo="UF", decimales=2, separador_miles="."))
         elif tipo == 'porcentaje':
             df_out[col] = df_out[col].apply(lambda x: formato_porcentaje(x))
         elif tipo == 'porcentaje_1dec':

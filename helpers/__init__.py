@@ -7,7 +7,7 @@ from .display_helper import DisplayHelper, mostrar_tabla
 from utils.batch_processor import unir_archivos_carpeta
 from utils.excel_writer import escribir_en_excel
 from utils.validator import validar_dataframe, reporte_calidad, detectar_duplicados
-from utils.data_helpers import buscar_v, conciliar_tablas, obtener_celda, modificar_celda
+from utils.data_helpers import buscar_v, conciliar_tablas, obtener_celda, modificar_celda, formato_clp, formato_porcentaje, formato_moneda
 
 __all__ = [
     "TableManager",
@@ -23,6 +23,9 @@ __all__ = [
     "conciliar_tablas",
     "obtener_celda",
     "modificar_celda",
+    "formato_clp",
+    "formato_porcentaje",
+    "formato_moneda",
     "DisplayHelper",
     "mostrar_tabla",
 ]
