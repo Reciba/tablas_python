@@ -141,22 +141,56 @@ def formato_moneda(val: Any, simbolo: str = "$", decimales: int = 0, separador_m
     return f"{simbolo} {texto}" if simbolo else texto
 
 
-def formato_porcentaje(val: Any, decimales: int = 1) -> str:
+def formato_porcentaje(
+    val: Any,
+    decimales: Optional[int] = None,
+    multiplicar_por_100: bool = False,
+    separador_decimal: str = ","
+) -> str:
     """
-    Formatea un valor a porcentaje.
-    Ejemplo:
-        formato_porcentaje(15.42) -> "15.4%"
-        formato_porcentaje(0.1542, es_ratio=True)
+    Formatea un valor a porcentaje de manera exacta.
+    
+    A diferencia de versiones anteriores, NO multiplica arbitrariamente por 100
+    a menos que se indique explícitamente con `multiplicar_por_100=True`.
+    Por lo tanto, 0.056 se muestra como 0,056% y 5.56 se muestra como 5,56%.
+    
+    Ejemplos:
+        formato_porcentaje(5.56)                     -> "5,56%"
+        formato_porcentaje(0.056)                    -> "0,056%"
+        formato_porcentaje("0.056%")                 -> "0,056%"
+        formato_porcentaje(0.056, multiplicar_por_100=True)  -> "5,6%"
+        formato_porcentaje(15.42, decimales=1)       -> "15,4%"
     """
+    if pd.isna(val) or val is None or str(val).strip() == "":
+        return ""
+
+    s_orig = str(val).strip()
+    tenia_simbolo_pct = "%" in s_orig
+
     num = limpiar_numero(val)
     if pd.isna(num) or not isinstance(num, (int, float)):
-        return "" if pd.isna(val) else str(val)
-    
-    # Si el valor está entre 0 y 1 (ratio), convertir a base 100
-    if -1.0 <= num <= 1.0 and num != 0:
+        return s_orig
+
+    # Solo multiplicar por 100 si el usuario lo pide explícitamente y el valor NO traía ya el '%'
+    if multiplicar_por_100 and not tenia_simbolo_pct:
         num = num * 100
 
-    return f"{num:.{decimales}f}%"
+    if decimales is not None:
+        fmt_str = f"{{:.{decimales}f}}"
+        txt_num = fmt_str.format(num)
+    else:
+        # Conservar los decimales significativos del número sin truncar
+        if isinstance(num, int) or (isinstance(num, float) and num.is_integer()):
+            txt_num = str(int(num))
+        else:
+            txt_num = f"{num:.6f}".rstrip('0').rstrip('.')
+
+    if separador_decimal == ",":
+        txt_num = txt_num.replace(".", ",")
+    else:
+        txt_num = txt_num.replace(",", ".")
+
+    return f"{txt_num}%"
 
 
 def formato_miles(val: Any, decimales: int = 0) -> str:
@@ -176,6 +210,8 @@ def formatear_dataframe(
             'Ventas': 'moneda',
             'Precio': 'moneda_2dec',
             'Margen': 'porcentaje',
+            'Participacion': 'porcentaje_1dec',
+            'Ratio': 'ratio_pct',
             'Cantidad': 'miles'
         })
     """
@@ -188,7 +224,13 @@ def formatear_dataframe(
         elif tipo == 'moneda_2dec':
             df_out[col] = df_out[col].apply(lambda x: formato_moneda(x, decimales=2))
         elif tipo == 'porcentaje':
-            df_out[col] = df_out[col].apply(formato_porcentaje)
+            df_out[col] = df_out[col].apply(lambda x: formato_porcentaje(x))
+        elif tipo == 'porcentaje_1dec':
+            df_out[col] = df_out[col].apply(lambda x: formato_porcentaje(x, decimales=1))
+        elif tipo == 'porcentaje_2dec':
+            df_out[col] = df_out[col].apply(lambda x: formato_porcentaje(x, decimales=2))
+        elif tipo == 'ratio_pct':
+            df_out[col] = df_out[col].apply(lambda x: formato_porcentaje(x, multiplicar_por_100=True, decimales=1))
         elif tipo == 'miles':
             df_out[col] = df_out[col].apply(formato_miles)
     return df_out
