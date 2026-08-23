@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tablas-python"
+version = "0.1.0"
+description = "Suite modular para extraer, transformar, conciliar y exportar tablas desde PDF, Excel y SQLite a pandas."
+readme = "README.md"
+authors = [
+  { name = "Reciba" }
+]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Spreadsheet",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+keywords = [
+    "tables",
+    "pdf",
+    "excel",
+    "xlwings",
+    "pdfplumber",
+    "sqlite",
+    "pandas",
+    "data-extraction",
+    "vlookup",
+    "conciliation"
+]
+requires-python = ">=3.8"
+dependencies = [
+    "pandas>=1.5.0",
+    "pdfplumber>=0.9.0",
+    "openpyxl>=3.1.0",
+    "xlwings>=0.30.0",
+    "rich>=13.0.0",
+    "numpy>=1.20.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "twine",
+    "pytest",
+    "reportlab>=3.6.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/Reciba/tablas_python"
+Repository = "https://github.com/Reciba/tablas_python.git"
+Issues = "https://github.com/Reciba/tablas_python/issues"
+
+[project.scripts]
+tablas = "tablas_python.cli:main"
+tablas-python = "tablas_python.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tablas_python*", "utils*", "helpers*"]
