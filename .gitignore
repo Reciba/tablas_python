@@ -42,3 +42,7 @@ venv.bak/
 # Exports & Logs (Keep sample outputs clean)
 .pytest_cache/
 *.log
+exports/
+
+# Local LLM Context & Documentation (Local only)
+docs/
