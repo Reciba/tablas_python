@@ -24,17 +24,36 @@ except ImportError:
 from .file_utils import resolve_file_path
 
 
+def _find_open_workbook_in_excel(target: str) -> Optional[Any]:
+    """Busca y retorna el objeto Book de xlwings si está abierto en memoria."""
+    if not HAS_XLWINGS:
+        return None
+    try:
+        if not target or target.lower() in ["", "activo", "active", "libro_activo"]:
+            if len(xw.books) > 0:
+                return xw.books.active
+            return None
+
+        clean_target = os.path.basename(target).strip().lower()
+        name_no_ext = os.path.splitext(clean_target)[0]
+
+        for book in xw.books:
+            b_name = book.name.lower()
+            b_name_no_ext = os.path.splitext(b_name)[0]
+            b_fullname = getattr(book, 'fullname', '').lower()
+
+            if (clean_target == b_name or
+                name_no_ext == b_name_no_ext or
+                (b_fullname and clean_target == os.path.basename(b_fullname).lower())):
+                return book
+    except Exception:
+        return None
+    return None
+
+
 def _is_workbook_open_in_excel(file_path: str, file_name: str) -> bool:
     """Comprueba si el libro ya está abierto en Excel activo."""
-    if not HAS_XLWINGS:
-        return False
-    try:
-        for book in xw.books:
-            if book.name.lower() == file_name.lower() or book.fullname.lower() == file_path.lower():
-                return True
-    except Exception:
-        return False
-    return False
+    return _find_open_workbook_in_excel(file_name) is not None or _find_open_workbook_in_excel(file_path) is not None
 
 
 def escribir_en_excel(
@@ -50,35 +69,45 @@ def escribir_en_excel(
 ) -> str:
     """
     Escribe un DataFrame directamente en una celda específica de un libro de Excel.
-
-    Parámetros:
-    -----------
-    df : pd.DataFrame
-        El DataFrame con los datos a escribir.
-    archivo_excel : str
-        Ruta o nombre del archivo Excel.
-    hoja : str o int (por defecto 1)
-        Nombre o número de la hoja donde se escribirán los datos.
-    celda_inicio : str (por defecto 'A1')
-        Coordenada de la celda superior izquierda donde comenzará a escribirse (ej: 'B5', 'C4').
-    incluir_encabezados : bool (por defecto True)
-        Si escribe los nombres de las columnas en la primera fila.
-    incluir_indice : bool (por defecto False)
-        Si incluye la columna de índice de pandas.
-    guardar : bool (por defecto True)
-        Si guarda el archivo tras escribir.
-    archivo_abierto : bool o None
-        - True: Se conecta a la ventana activa de Excel.
-        - False: Trabaja en segundo plano cerrado.
-        - None: Detecta automáticamente si está abierto o cerrado.
-    crear_si_no_existe : bool (por defecto True)
-        Crea un nuevo archivo Excel si no existe en la ruta dada.
-
-    Retorna:
-    --------
-    str
-        Ruta absoluta del archivo modificado.
     """
+    # 1. Si está abierto en memoria o archivo_abierto=True, usar directamente xlwings
+    if HAS_XLWINGS and archivo_abierto is not False:
+        matched_book = _find_open_workbook_in_excel(archivo_excel)
+        if matched_book:
+            book = matched_book
+            # Seleccionar o crear hoja
+            sheet_names = [s.name for s in book.sheets]
+            if isinstance(hoja, int):
+                if 1 <= hoja <= len(book.sheets):
+                    sht = book.sheets[hoja - 1]
+                else:
+                    sht = book.sheets.add(f"Hoja{hoja}")
+            else:
+                if str(hoja) in sheet_names:
+                    sht = book.sheets[str(hoja)]
+                else:
+                    sht = book.sheets.add(str(hoja))
+
+            clean_cell = celda_inicio.replace("$", "").upper()
+            sht.range(clean_cell).options(
+                index=incluir_indice,
+                header=incluir_encabezados
+            ).value = df
+
+            if guardar:
+                try: book.save()
+                except Exception: pass
+
+            return getattr(book, 'fullname', book.name)
+
+    if archivo_abierto is True and HAS_XLWINGS:
+        abiertos = [b.name for b in xw.books] if len(xw.books) > 0 else []
+        raise FileNotFoundError(
+            f"No se encontró ningún libro abierto en Excel con el nombre '{archivo_excel}'. "
+            f"Libros actualmente abiertos en Excel: {abiertos if abiertos else 'Ninguno (Excel no tiene libros abiertos)'}"
+        )
+
+    # 2. Si es archivo cerrado en disco
     try:
         resolved_path = resolve_file_path(archivo_excel)
     except Exception:
@@ -87,7 +116,6 @@ def escribir_en_excel(
     if not os.path.exists(resolved_path):
         if crear_si_no_existe:
             os.makedirs(os.path.dirname(resolved_path), exist_ok=True)
-            # Crear libro vacío con openpyxl o pandas
             df_init = pd.DataFrame()
             with pd.ExcelWriter(resolved_path, engine='openpyxl') as writer:
                 sheet_title = hoja if isinstance(hoja, str) else "Hoja1"
@@ -99,64 +127,45 @@ def escribir_en_excel(
 
     # Intentar con xlwings si está disponible
     if HAS_XLWINGS:
+        app = None
+        book = None
         try:
-            is_open = _is_workbook_open_in_excel(resolved_path, file_name)
-            should_connect = archivo_abierto is True or (archivo_abierto is None and is_open)
+            app = xw.App(visible=False, add_book=False)
+            app.display_alerts = False
+            app.screen_updating = False
+            book = app.books.open(resolved_path)
 
-            app = None
-            book = None
-            needs_close = False
-
-            try:
-                if should_connect:
-                    try:
-                        book = xw.books[file_name]
-                    except Exception:
-                        book = xw.Book(resolved_path)
+            sheet_names = [s.name for s in book.sheets]
+            if isinstance(hoja, int):
+                if 1 <= hoja <= len(book.sheets):
+                    sht = book.sheets[hoja - 1]
                 else:
-                    app = xw.App(visible=False, add_book=False)
-                    app.display_alerts = False
-                    app.screen_updating = False
-                    book = app.books.open(resolved_path)
-                    needs_close = True
-
-                # Seleccionar o crear hoja
-                sheet_names = [s.name for s in book.sheets]
-                if isinstance(hoja, int):
-                    if 1 <= hoja <= len(book.sheets):
-                        sht = book.sheets[hoja - 1]
-                    else:
-                        sht = book.sheets.add(f"Hoja{hoja}")
+                    sht = book.sheets.add(f"Hoja{hoja}")
+            else:
+                if str(hoja) in sheet_names:
+                    sht = book.sheets[str(hoja)]
                 else:
-                    if str(hoja) in sheet_names:
-                        sht = book.sheets[str(hoja)]
-                    else:
-                        sht = book.sheets.add(str(hoja))
+                    sht = book.sheets.add(str(hoja))
 
-                # Escribir DataFrame en la celda indicada
-                clean_cell = celda_inicio.replace("$", "").upper()
-                sht.range(clean_cell).options(
-                    index=incluir_indice,
-                    header=incluir_encabezados
-                ).value = df
+            clean_cell = celda_inicio.replace("$", "").upper()
+            sht.range(clean_cell).options(
+                index=incluir_indice,
+                header=incluir_encabezados
+            ).value = df
 
-                if guardar:
-                    book.save()
+            if guardar:
+                book.save()
 
-                return resolved_path
+            return resolved_path
+        finally:
+            if book:
+                try: book.close()
+                except Exception: pass
+            if app:
+                try: app.quit()
+                except Exception: pass
 
-            finally:
-                if needs_close:
-                    if book:
-                        try: book.close()
-                        except Exception: pass
-                    if app:
-                        try: app.quit()
-                        except Exception: pass
-
-        except Exception as e:
-            # Fallback a openpyxl si ocurre algún error COM
-            pass
+        return resolved_path
 
     # Fallback con openpyxl si xlwings no pudo ejecutarse
     if HAS_OPENPYXL:

@@ -58,14 +58,58 @@ class TableManager:
         auto_load : bool (por defecto True)
             Carga las tablas automáticamente al instanciar.
         """
+        self.archivo_abierto = archivo_abierto
+        self.preferir_xlwings = preferir_xlwings
+        self.tables: List[Union[RawTableInfo, RawExcelTableInfo, RawSQLiteTableInfo]] = []
+        self.is_open_in_memory = False
+
+        # 1. Si es Excel y archivo_abierto=True o None, buscar primero en libros abiertos en pantalla (xlwings)
+        if self.preferir_xlwings and archivo_abierto is not False:
+            try:
+                import xlwings as xw
+                if not file_path or file_path.lower() in ["", "activo", "active", "libro_activo"]:
+                    matched_book = xw.books.active if len(xw.books) > 0 else None
+                else:
+                    clean_target = os.path.basename(file_path).strip().lower()
+                    name_no_ext = os.path.splitext(clean_target)[0]
+                    matched_book = None
+                    for b in xw.books:
+                        b_name = b.name.lower()
+                        b_name_no_ext = os.path.splitext(b_name)[0]
+                        b_fullname = getattr(b, 'fullname', '').lower()
+                        if (clean_target == b_name or
+                            name_no_ext == b_name_no_ext or
+                            (b_fullname and clean_target == os.path.basename(b_fullname).lower())):
+                            matched_book = b
+                            break
+
+                if matched_book:
+                    self.file_path = getattr(matched_book, 'fullname', matched_book.name)
+                    self.ext = os.path.splitext(matched_book.name)[1].lower() or ".xlsx"
+                    self.is_open_in_memory = True
+                    if auto_load:
+                        self.cargar_tablas()
+                    return
+            except Exception:
+                pass
+
+        if archivo_abierto is True:
+            try:
+                import xlwings as xw
+                abiertos = [b.name for b in xw.books] if len(xw.books) > 0 else []
+            except Exception:
+                abiertos = []
+            raise FileNotFoundError(
+                f"No se encontró ningún libro abierto en Excel con el nombre '{file_path}'. "
+                f"Libros actualmente abiertos en Excel: {abiertos if abiertos else 'Ninguno (Excel no tiene libros abiertos)'}"
+            )
+
+        # 2. Si no es un libro abierto en memoria, resolver la ruta física en disco
         self.file_path = resolve_file_path(file_path)
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"No se encontró el archivo: {self.file_path}")
         
         self.ext = os.path.splitext(self.file_path)[1].lower()
-        self.archivo_abierto = archivo_abierto
-        self.preferir_xlwings = preferir_xlwings
-        self.tables: List[Union[RawTableInfo, RawExcelTableInfo, RawSQLiteTableInfo]] = []
         
         valid_extensions = ['.pdf', '.xlsx', '.xls', '.xlsm', '.csv', '.db', '.sqlite', '.sqlite3', '.db3']
         if self.ext not in valid_extensions:

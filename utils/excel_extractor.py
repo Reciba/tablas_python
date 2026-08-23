@@ -63,25 +63,66 @@ class ExcelTableExtractor:
         archivo_abierto: Optional[bool] = None,
         preferir_xlwings: bool = True
     ):
+        self.archivo_abierto = archivo_abierto
+        self.preferir_xlwings = preferir_xlwings and HAS_XLWINGS
+        self.book_name = os.path.basename(file_path) if file_path else ""
+        self.is_open_in_memory = False
+
+        # 1. Si el usuario indicó archivo_abierto=True o None, buscar primero en libros abiertos de xlwings
+        if self.preferir_xlwings and archivo_abierto is not False:
+            matched_book = self._find_open_workbook_in_excel(file_path)
+            if matched_book:
+                self.book_name = matched_book.name
+                self.file_path = getattr(matched_book, 'fullname', matched_book.name)
+                self.ext = os.path.splitext(matched_book.name)[1].lower() or ".xlsx"
+                self.is_open_in_memory = True
+                return
+
+        # Si forzó archivo_abierto=True pero no se encontró libro abierto en Excel
+        if archivo_abierto is True and self.preferir_xlwings:
+            abiertos = [b.name for b in xw.books] if HAS_XLWINGS and len(xw.books) > 0 else []
+            raise FileNotFoundError(
+                f"No se encontró ningún libro abierto en Excel con el nombre '{file_path}'. "
+                f"Libros actualmente abiertos en Excel: {abiertos if abiertos else 'Ninguno (Excel no tiene libros abiertos)'}"
+            )
+
+        # 2. Si es un archivo cerrado o en disco, resolver la ruta física
         self.file_path = resolve_file_path(file_path)
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"No se encontró el archivo Excel en: {self.file_path}")
         
         self.ext = os.path.splitext(self.file_path)[1].lower()
-        self.archivo_abierto = archivo_abierto
-        self.preferir_xlwings = preferir_xlwings and HAS_XLWINGS
+
+    def _find_open_workbook_in_excel(self, target: str) -> Optional[Any]:
+        """Busca y retorna el objeto Book de xlwings si está abierto en memoria."""
+        if not HAS_XLWINGS:
+            return None
+        try:
+            if not target or target.lower() in ["", "activo", "active", "libro_activo", "hoja_activa"]:
+                if len(xw.books) > 0:
+                    return xw.books.active
+                return None
+
+            clean_target = os.path.basename(target).strip().lower()
+            name_no_ext = os.path.splitext(clean_target)[0]
+
+            for book in xw.books:
+                b_name = book.name.lower()
+                b_name_no_ext = os.path.splitext(b_name)[0]
+                b_fullname = getattr(book, 'fullname', '').lower()
+
+                # Comparar con nombre completo, sin extensión o fullname
+                if (clean_target == b_name or
+                    name_no_ext == b_name_no_ext or
+                    (b_fullname and clean_target == os.path.basename(b_fullname).lower())):
+                    return book
+        except Exception:
+            return None
+        return None
 
     def _is_workbook_open_in_excel(self, file_name: str) -> bool:
         """Comprueba si el libro ya está abierto en alguna sesión activa de Excel."""
-        if not HAS_XLWINGS:
-            return False
-        try:
-            for book in xw.books:
-                if book.name.lower() == file_name.lower() or book.fullname.lower() == self.file_path.lower():
-                    return True
-        except Exception:
-            return False
-        return False
+        return self._find_open_workbook_in_excel(file_name) is not None
 
     def extract_by_cell_or_range(
         self,
