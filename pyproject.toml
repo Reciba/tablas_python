@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tablas-python"
-version = "0.1.4"
+version = "0.1.5"
 description = "Suite modular para extraer, transformar, conciliar y exportar tablas desde PDF, Excel y SQLite a pandas."
 readme = "README.md"
 authors = [

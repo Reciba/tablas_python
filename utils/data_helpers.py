@@ -14,27 +14,30 @@ import numpy as np
 # 1. PARSEO Y LIMPIEZA DE NÚMEROS Y FECHAS
 # ==========================================
 
-def limpiar_numero(val: Any) -> Union[float, int, Any]:
+def limpiar_numero(val: Any, default: Any = np.nan) -> Union[float, int, Any]:
     """
-    Convierte cualquier cadena con formato numérico, moneda o porcentaje a float o int.
-    Maneja formatos latinoamericanos (1.234,56) y anglosajones (1,234.56),
+    Convierte cualquier valor numérico, moneda o porcentaje a float o int de forma precisa.
+    Maneja formatos latinoamericanos (1.234,56 / 0,056), anglosajones (1,234.56 / 0.056),
     símbolos ($ / € / USD / CLP / %), y negativos entre paréntesis (100) -> -100.
     
     Ejemplos:
+        limpiar_numero("0,056")       -> 0.056
+        limpiar_numero("9,999")       -> 9.999
+        limpiar_numero("89,949")      -> 89.949
+        limpiar_numero("0,056%")      -> 0.056
         limpiar_numero("$ 1.250.000") -> 1250000.0
-        limpiar_numero("18,5 %")      -> 18.5
-        limpiar_numero("(450.50)")    -> -450.50
+        limpiar_numero("(450,50)")    -> -450.50
     """
     if pd.isna(val) or val is None:
-        return np.nan
+        return default
     if isinstance(val, (int, float, np.number)):
-        return val
+        return float(val) if isinstance(val, float) else val
 
     s = str(val).strip()
     if not s:
-        return np.nan
+        return default
 
-    # Detectar negativos con paréntesis: (123.45)
+    # 1. Detectar negativos con paréntesis: (123.45) o (123,45)
     es_negativo = False
     if s.startswith("(") and s.endswith(")"):
         es_negativo = True
@@ -43,46 +46,48 @@ def limpiar_numero(val: Any) -> Union[float, int, Any]:
         es_negativo = True
         s = s[1:].strip()
 
-    # Remover símbolos de monedas y palabras comunes
+    # 2. Remover símbolos de monedas y texto innecesario
     s = re.sub(r'[\$\€\£\¥\s]|USD|CLP|EUR|UF', '', s, flags=re.IGNORECASE)
     # Remover %
     s = s.replace('%', '').strip()
 
     if not s:
-        return np.nan
+        return default
 
-    # Determinar si el separador decimal es coma o punto
-    # Caso 1: Tiene comas y puntos (ej: 1.234.567,89 o 1,234,567.89)
+    # 3. Determinar separadores decimales y de miles
+    # Caso A: Tiene comas y puntos (ej: 1.234.567,89 o 1,234,567.89)
     if '.' in s and ',' in s:
         if s.rfind(',') > s.rfind('.'):
-            # Formato latino: 1.234,56 -> quitar puntos y coma a punto
+            # Formato latino: 1.234.567,89 -> quitar puntos y reemplazar coma por punto
             s = s.replace('.', '').replace(',', '.')
         else:
-            # Formato anglo: 1,234.56 -> quitar comas
+            # Formato anglo: 1,234,567.89 -> quitar comas
             s = s.replace(',', '')
+
+    # Caso B: Solo tiene coma(s)
     elif ',' in s:
-        # Solo tiene comas. Si tiene 1 coma y max 2 decimales al final: 1234,56
-        partes = s.split(',')
-        if len(partes) == 2 and len(partes[1]) <= 2:
+        num_comas = s.count(',')
+        if num_comas == 1:
+            # 1 sola coma: SIEMPRE es separador decimal en español (ej: 0,056 | 9,999 | 89,949 | 123,45)
             s = s.replace(',', '.')
         else:
-            # Es separador de miles: 1,000,000
+            # Múltiples comas: separador de miles anglosajón (ej: 1,000,000)
             s = s.replace(',', '')
+
+    # Caso C: Solo tiene punto(s)
     elif '.' in s:
-        # Solo tiene puntos. Si tiene múltiples puntos: 1.000.000
-        if s.count('.') > 1:
+        num_puntos = s.count('.')
+        if num_puntos > 1:
+            # Múltiples puntos: separador de miles latino (ej: 1.000.000)
             s = s.replace('.', '')
-        # Si tiene 1 punto y exactamente 3 dígitos después, puede ser miles (ej: 1.500)
-        # pero en float estándar suele ser decimal. Lo dejamos a float directo.
 
     try:
         num = float(s)
         if es_negativo:
             num = -num
-        # Si no tiene decimales reales, retornar float o int
         return num
     except ValueError:
-        return val
+        return default
 
 
 def limpiar_columnas_numericas(df: pd.DataFrame, columnas: Union[str, List[str]]) -> pd.DataFrame:

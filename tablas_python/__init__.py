@@ -32,7 +32,7 @@ from utils.data_helpers import (
     conciliar_tablas,
 )
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 __all__ = [
     "TableManager",
