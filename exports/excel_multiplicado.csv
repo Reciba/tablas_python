@@ -1,0 +1,7 @@
+﻿ID_Item;Nombre_Articulo;Bodega;Stock;Costo_Unitario;Valor_Total;Valor_Total_Calculado
+ART-001;Tuerca Hexagonal M8 (Pack 100);Bodega Central;150,0;4,5;675,0;675,0
+ART-002;Perno Acero Inox 2 pulg;Bodega Central;320,0;1,2;384,0;384,0
+ART-003;Disco Corte Metal 4 1/2;Bodega Norte;85,0;3,8;323,0;323,0
+ART-004;Guantes Nitrilo Talla L;Bodega Sur;200,0;2,1;420,0;420,0
+ART-005;Soldadura 6011 1/8 (Kg);Bodega Central;45,0;12,5;562,5;562,5
+ART-006;Cinta Aisladora 3M Negra;Bodega Norte;110,0;1,95;214,5;214,5

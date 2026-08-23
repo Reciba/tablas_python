@@ -1,0 +1,7 @@
+﻿id_venta;id_cliente;fecha;monto_neto;estado
+101;1;2026-08-01;12500,0;Pagado
+102;3;2026-08-03;45000,0;Pagado
+103;2;2026-08-05;8200,0;Pendiente
+104;1;2026-08-10;16800,0;Pagado
+105;4;2026-08-12;9400,0;Pagado
+106;5;2026-08-15;3100,0;Pendiente

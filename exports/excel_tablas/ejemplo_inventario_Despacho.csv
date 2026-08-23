@@ -1,0 +1,7 @@
+﻿Col_3;Col_4;Col_5;Col_6
+CONTROL DE RUTAS REGIONALES;;;
+Codigo_Ruta;Chofer;Vehiculo;Estado
+RUT-01;Pedro Gomez;Camioneta Ford;En Transito
+RUT-02;Juan Perez;Furgon Peugeot;Entregado
+RUT-03;Mario Soto;Camion Mercedes;En Carga
+RUT-04;Luis Varas;Furgon Hyundai;Pendiente

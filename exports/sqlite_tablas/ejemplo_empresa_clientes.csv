@@ -1,0 +1,6 @@
+﻿id_cliente;nombre;ciudad;segmento;credito_max
+1;Distribuidora Los Andes;Santiago;Corporativo;50000,0
+2;Comercial del Sur SpA;Concepcion;PYME;15000,0
+3;Servicios Mineros Antofagasta;Antofagasta;Corporativo;120000,0
+4;Importadora Valparaiso;Valparaiso;PYME;25000,0
+5;Ferreteria Central;Rancagua;Minorista;8000,0

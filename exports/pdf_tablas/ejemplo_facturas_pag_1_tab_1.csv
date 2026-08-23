@@ -1,0 +1,9 @@
+﻿Codigo;Descripcion Producto;Categoria;Cantidad;Precio Unitario;Subtotal
+PROD-101;Sensor Ultrasonido Industrial;Sensores;15;45.50;682.50
+PROD-102;Controlador PLC Modular;Automatizacion;4;320.00;1280.00
+PROD-103;Valvula Solenoide 24V;Neumatica;22;18.75;412.50
+PROD-104;Fuente de Poder 24V 10A;Electrico;8;65.00;520.00
+PROD-105;Panel HMI Tactil 7 pulg;Automatizacion;2;450.00;900.00
+PROD-106;Cable Blindado 4x1.5mm (100m);Cables;3;88.00;264.00
+PROD-107;Rele de Seguridad 2 Canales;Seguridad;6;110.00;660.00
+* NOTA: Precios netos antes de impuestos. Descuento comercial aplicado.;;;;;
