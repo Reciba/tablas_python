@@ -14,17 +14,20 @@ import numpy as np
 # 1. PARSEO Y LIMPIEZA DE NÚMEROS Y FECHAS
 # ==========================================
 
-def limpiar_numero(val: Any, default: Any = np.nan) -> Union[float, int, Any]:
+def limpiar_numero(val: Any, default: Any = 0) -> Union[float, int, Any]:
     """
     Convierte cualquier valor numérico, moneda o porcentaje a float o int de forma precisa.
+    Si el valor está vacío, es nulo o texto sin número (ej: '-', 'N/A', 'null'), retorna 0 (o el default indicado).
+    
     Maneja formatos latinoamericanos (1.234,56 / 0,056), anglosajones (1,234.56 / 0.056),
     símbolos ($ / € / USD / CLP / %), y negativos entre paréntesis (100) -> -100.
     
     Ejemplos:
         limpiar_numero("0,056")       -> 0.056
-        limpiar_numero("9,999")       -> 9.999
-        limpiar_numero("89,949")      -> 89.949
-        limpiar_numero("0,056%")      -> 0.056
+        limpiar_numero("")            -> 0
+        limpiar_numero("-")           -> 0
+        limpiar_numero("N/A")         -> 0
+        limpiar_numero(None)          -> 0
         limpiar_numero("$ 1.250.000") -> 1250000.0
         limpiar_numero("(450,50)")    -> -450.50
     """
@@ -34,7 +37,7 @@ def limpiar_numero(val: Any, default: Any = np.nan) -> Union[float, int, Any]:
         return float(val) if isinstance(val, float) else val
 
     s = str(val).strip()
-    if not s:
+    if not s or s.lower() in ['', '-', '--', 'n/a', 'na', 'null', 'none', 's/i', 's/n']:
         return default
 
     # 1. Detectar negativos con paréntesis: (123.45) o (123,45)
@@ -80,6 +83,13 @@ def limpiar_numero(val: Any, default: Any = np.nan) -> Union[float, int, Any]:
         if num_puntos > 1:
             # Múltiples puntos: separador de miles latino (ej: 1.000.000)
             s = s.replace('.', '')
+        else:
+            # 1 solo punto (ej: 250.000, 39.990 vs 0.056, 12.5)
+            partes = s.split('.')
+            if len(partes) == 2:
+                # Si no empieza con '0' y tiene exactamente 3 dígitos tras el punto, es separador de miles (ej: 250.000)
+                if partes[0] not in ['0', '-0'] and len(partes[1]) == 3:
+                    s = s.replace('.', '')
 
     try:
         num = float(s)
@@ -90,17 +100,22 @@ def limpiar_numero(val: Any, default: Any = np.nan) -> Union[float, int, Any]:
         return default
 
 
-def limpiar_columnas_numericas(df: pd.DataFrame, columnas: Union[str, List[str]]) -> pd.DataFrame:
+def limpiar_columnas_numericas(
+    df: pd.DataFrame,
+    columnas: Union[str, List[str]],
+    rellenar_nulos: Any = 0
+) -> pd.DataFrame:
     """
-    Convierte una o más columnas a tipo numérico (float) limpiando caracteres extra.
+    Convierte una o más columnas a tipo numérico (float) limpiando caracteres extra
+    y rellenando valores vacíos o nulos con 0 (o el valor indicado).
     """
     df_out = df.copy()
     if isinstance(columnas, str):
         columnas = [columnas]
     for col in columnas:
         if col in df_out.columns:
-            df_out[col] = df_out[col].apply(limpiar_numero)
-            df_out[col] = pd.to_numeric(df_out[col], errors='coerce')
+            df_out[col] = df_out[col].apply(lambda x: limpiar_numero(x, default=rellenar_nulos))
+            df_out[col] = pd.to_numeric(df_out[col], errors='coerce').fillna(rellenar_nulos)
     return df_out
 
 
