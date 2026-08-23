@@ -240,12 +240,19 @@ def calcular_participacion(
     df: pd.DataFrame,
     columna_valor: str,
     nombre_col: str = "% Participación",
-    decimales: int = 1
+    decimales: int = 1,
+    mostrar_feedback: bool = True
 ) -> pd.DataFrame:
     """
     Calcula el porcentaje de participación de cada fila sobre el total de la columna.
     """
     df_out = df.copy()
+    if df_out.empty:
+        return df_out
+    if columna_valor not in df_out.columns:
+        if mostrar_feedback:
+            print(f"⚠️ [calcular_participacion] La columna '{columna_valor}' no existe. Columnas disponibles: {list(df_out.columns)}")
+        return df_out
     total = df_out[columna_valor].sum()
     if total != 0 and pd.notna(total):
         df_out[nombre_col] = ((df_out[columna_valor] / total) * 100).round(decimales)
@@ -259,12 +266,20 @@ def calcular_variacion(
     col_actual: str,
     col_anterior: str,
     nombre_col: str = "% Variación",
-    decimales: int = 1
+    decimales: int = 1,
+    mostrar_feedback: bool = True
 ) -> pd.DataFrame:
     """
     Calcula la variación porcentual entre dos columnas: ((actual - anterior) / anterior) * 100.
     """
     df_out = df.copy()
+    if df_out.empty:
+        return df_out
+    faltantes = [c for c in [col_actual, col_anterior] if c not in df_out.columns]
+    if faltantes:
+        if mostrar_feedback:
+            print(f"⚠️ [calcular_variacion] Columnas no encontradas: {faltantes}. Columnas disponibles: {list(df_out.columns)}")
+        return df_out
     ant = df_out[col_anterior]
     act = df_out[col_actual]
     var = np.where(ant != 0, ((act - ant) / ant.abs()) * 100, 0.0)
@@ -277,12 +292,19 @@ def aplicar_impuesto(
     col_neto: str,
     tasa: float = 0.19,
     col_iva: str = "IVA (19%)",
-    col_total: str = "Total Bruto"
+    col_total: str = "Total Bruto",
+    mostrar_feedback: bool = True
 ) -> pd.DataFrame:
     """
     Calcula el IVA (o impuesto) y el valor bruto a partir de una columna neta.
     """
     df_out = df.copy()
+    if df_out.empty:
+        return df_out
+    if col_neto not in df_out.columns:
+        if mostrar_feedback:
+            print(f"⚠️ [aplicar_impuesto] La columna '{col_neto}' no existe en el DataFrame. Columnas disponibles: {list(df_out.columns)}")
+        return df_out
     df_out[col_iva] = (df_out[col_neto] * tasa).round(2)
     df_out[col_total] = (df_out[col_neto] + df_out[col_iva]).round(2)
     return df_out
@@ -291,7 +313,8 @@ def aplicar_impuesto(
 def agrupar_y_resumir(
     df: pd.DataFrame,
     por: Union[str, List[str]],
-    metricas: Dict[str, Union[str, List[str]]]
+    metricas: Dict[str, Union[str, List[str]]],
+    mostrar_feedback: bool = True
 ) -> pd.DataFrame:
     """
     Agrupa un DataFrame y calcula sumas, promedios o conteos en una sola línea.
@@ -299,7 +322,20 @@ def agrupar_y_resumir(
     Ejemplo:
         resumen = agrupar_y_resumir(df, por='Categoria', metricas={'Subtotal': 'sum', 'Cantidad': 'sum'})
     """
-    agrupado = df.groupby(por).agg(metricas).reset_index()
+    if df.empty:
+        return pd.DataFrame()
+    cols_por = [por] if isinstance(por, str) else list(por)
+    cols_faltantes = [c for c in cols_por if c not in df.columns]
+    if cols_faltantes:
+        if mostrar_feedback:
+            print(f"⚠️ [agrupar_y_resumir] Columnas de agrupación no encontradas: {cols_faltantes}. Columnas disponibles: {list(df.columns)}")
+        return df
+    metricas_validas = {k: v for k, v in metricas.items() if k in df.columns}
+    if not metricas_validas:
+        if mostrar_feedback:
+            print(f"⚠️ [agrupar_y_resumir] Ninguna de las columnas de métricas {list(metricas.keys())} existe en el DataFrame.")
+        return df
+    agrupado = df.groupby(por).agg(metricas_validas).reset_index()
     return agrupado
 
 
@@ -307,10 +343,15 @@ def obtener_celda(
     df: pd.DataFrame,
     fila: Any,
     columna: str,
-    columna_identificador: Optional[str] = None
+    columna_identificador: Optional[str] = None,
+    default: Any = None,
+    lanzar_error: bool = False,
+    mostrar_feedback: bool = True
 ) -> Any:
     """
     Obtiene el valor de una celda puntual indicando el nombre/etiqueta de la fila y el nombre de la columna.
+    Si no se encuentra, muestra un mensaje de feedback amigable y devuelve un valor por defecto (None)
+    en lugar de interrumpir el programa con un error.
 
     Parámetros:
     -----------
@@ -321,19 +362,37 @@ def obtener_celda(
     columna : str
         El nombre de la columna deseada (ej: 'Precio Unitario', 'monto_neto').
     columna_identificador : str, opcional
-        Si el DataFrame no tiene como índice los nombres de filas, especifica qué columna
-        contiene el nombre buscado (ej: 'Codigo' o 'Producto'). Si es None, busca automáticamente.
+        Columna donde buscar el identificador. Si es None, busca automáticamente.
+    default : Any (por defecto None)
+        Valor a retornar si no se encuentra la fila o columna.
+    lanzar_error : bool (por defecto False)
+        Si es True, lanza KeyError en lugar de retornar el valor default.
+    mostrar_feedback : bool (por defecto True)
+        Si es True, imprime una advertencia informativa con sugerencias cuando no encuentra el dato.
 
     Ejemplos:
     ---------
-    # Caso 1: Con índice asignado
-    precio = obtener_celda(df_con_indice, fila="PROD-101", columna="Precio Unitario")
+    # Si existe:
+    precio = obtener_celda(df, fila="PROD-101", columna="Precio Unitario")
 
-    # Caso 2: Sin cambiar índice (busca en la columna 'Codigo')
-    precio = obtener_celda(df, fila="PROD-101", columna="Precio Unitario", columna_identificador="Codigo")
+    # Si NO existe, muestra feedback y devuelve None (sin dar error):
+    precio = obtener_celda(df, fila="PROD-999", columna="Precio Unitario")
+    # 👉 ⚠️ [obtener_celda] No se encontró la fila 'PROD-999' en el DataFrame. Retornando None.
     """
+    if df is None or df.empty:
+        if mostrar_feedback:
+            print(f"⚠️ [obtener_celda] El DataFrame está vacío o es None. Retornando {default}.")
+        if lanzar_error:
+            raise ValueError("El DataFrame está vacío o es None.")
+        return default
+
+    # Verificar columna
     if columna not in df.columns and columna != df.index.name:
-        raise KeyError(f"La columna '{columna}' no existe en el DataFrame. Columnas disponibles: {list(df.columns)}")
+        if mostrar_feedback:
+            print(f"⚠️ [obtener_celda] La columna '{columna}' no existe. Columnas disponibles: {list(df.columns)}. Retornando {default}.")
+        if lanzar_error:
+            raise KeyError(f"La columna '{columna}' no existe en el DataFrame. Columnas disponibles: {list(df.columns)}")
+        return default
 
     # 1. Si la fila coincide directamente con el índice de pandas
     if fila in df.index:
@@ -344,15 +403,24 @@ def obtener_celda(
         coincidencias = df[df[columna_identificador] == fila]
         if not coincidencias.empty:
             return coincidencias.iloc[0][columna]
-        raise KeyError(f"No se encontró ninguna fila con {columna_identificador}='{fila}'")
+        if mostrar_feedback:
+            print(f"⚠️ [obtener_celda] No se encontró ninguna fila con {columna_identificador}='{fila}'. Retornando {default}.")
+        if lanzar_error:
+            raise KeyError(f"No se encontró ninguna fila con {columna_identificador}='{fila}'")
+        return default
 
-    # 3. Búsqueda automática en la primera columna o cualquier columna de texto
+    # 3. Búsqueda automática en la primera columna o cualquier columna
     for col in df.columns:
         coincidencias = df[df[col].astype(str) == str(fila)]
         if not coincidencias.empty:
             return coincidencias.iloc[0][columna]
 
-    raise KeyError(f"No se encontró la fila identificada con '{fila}' en el DataFrame.")
+    if mostrar_feedback:
+        print(f"⚠️ [obtener_celda] No se encontró la fila identificada con '{fila}' en el DataFrame. Retornando {default}.")
+    if lanzar_error:
+        raise KeyError(f"No se encontró la fila identificada con '{fila}' en el DataFrame.")
+    
+    return default
 
 
 def modificar_celda(
@@ -360,12 +428,29 @@ def modificar_celda(
     fila: Any,
     columna: str,
     nuevo_valor: Any,
-    columna_identificador: Optional[str] = None
+    columna_identificador: Optional[str] = None,
+    lanzar_error: bool = False,
+    mostrar_feedback: bool = True
 ) -> pd.DataFrame:
     """
     Modifica el valor de una celda puntual buscando por nombre de fila y nombre de columna.
+    Si no se encuentra, muestra un mensaje de feedback y devuelve el DataFrame sin modificaciones.
     """
     df_out = df.copy()
+    if df_out.empty:
+        if mostrar_feedback:
+            print("⚠️ [modificar_celda] El DataFrame está vacío.")
+        if lanzar_error:
+            raise ValueError("El DataFrame está vacío.")
+        return df_out
+
+    if columna not in df_out.columns:
+        if mostrar_feedback:
+            print(f"⚠️ [modificar_celda] La columna '{columna}' no existe. Columnas disponibles: {list(df_out.columns)}")
+        if lanzar_error:
+            raise KeyError(f"La columna '{columna}' no existe.")
+        return df_out
+
     if fila in df_out.index:
         df_out.at[fila, columna] = nuevo_valor
         return df_out
@@ -376,7 +461,12 @@ def modificar_celda(
         df_out.at[idx[0], columna] = nuevo_valor
         return df_out
 
-    raise KeyError(f"No se encontró la fila '{fila}' para modificar.")
+    if mostrar_feedback:
+        print(f"⚠️ [modificar_celda] No se encontró la fila '{fila}' para modificar. El DataFrame no fue alterado.")
+    if lanzar_error:
+        raise KeyError(f"No se encontró la fila '{fila}' para modificar.")
+
+    return df_out
 
 
 def buscar_v(
@@ -386,45 +476,33 @@ def buscar_v(
     columna_a_traer: str,
     clave_destino: Optional[str] = None,
     nombre_columna: Optional[str] = None,
-    default: Any = np.nan
+    default: Any = np.nan,
+    lanzar_error: bool = False,
+    mostrar_feedback: bool = True
 ) -> Union[pd.Series, pd.DataFrame]:
     """
     Equivalente al BUSCARV / VLOOKUP de Excel para cruzar dos tablas en una sola línea.
-
-    Parámetros:
-    -----------
-    df_origen : pd.DataFrame
-        El DataFrame donde quieres insertar el nuevo valor (ej: df_ventas).
-    df_destino : pd.DataFrame
-        El DataFrame que contiene la tabla maestra con el dato buscado (ej: df_clientes).
-    clave : str
-        Nombre de la columna común en df_origen (ej: 'id_cliente').
-    columna_a_traer : str
-        Nombre de la columna que deseas extraer de df_destino (ej: 'nombre').
-    clave_destino : str, opcional
-        Nombre de la columna clave en df_destino si se llama distinto a 'clave'.
-    nombre_columna : str, opcional
-        Si se especifica, agrega la columna a df_origen y devuelve el DataFrame completo.
-        Si es None, devuelve una pd.Series lista para asignar.
-    default : Any (por defecto np.nan)
-        Valor a colocar si no se encuentra coincidencia.
-
-    Ejemplos:
-    ---------
-    # Forma 1: Asignación directa a una nueva columna
-    df_ventas["Nombre_Cliente"] = buscar_v(df_ventas, df_clientes, clave="id_cliente", columna_a_traer="nombre")
-
-    # Forma 2: Retornar DataFrame actualizado
-    df_resultado = buscar_v(df_ventas, df_clientes, clave="id_cliente", columna_a_traer="nombre", nombre_columna="Cliente")
     """
     target_key = clave_destino or clave
-    
+    errores = []
     if clave not in df_origen.columns:
-        raise KeyError(f"La clave '{clave}' no existe en df_origen.")
+        errores.append(f"La clave '{clave}' no existe en df_origen (disponibles: {list(df_origen.columns)})")
     if target_key not in df_destino.columns:
-        raise KeyError(f"La clave '{target_key}' no existe en df_destino.")
+        errores.append(f"La clave '{target_key}' no existe en df_destino (disponibles: {list(df_destino.columns)})")
     if columna_a_traer not in df_destino.columns:
-        raise KeyError(f"La columna '{columna_a_traer}' no existe en df_destino.")
+        errores.append(f"La columna a traer '{columna_a_traer}' no existe en df_destino (disponibles: {list(df_destino.columns)})")
+
+    if errores:
+        if mostrar_feedback:
+            print(f"⚠️ [buscar_v] Error de configuración: {'; '.join(errores)}")
+        if lanzar_error:
+            raise KeyError("; ".join(errores))
+        serie_vacia = pd.Series([default] * len(df_origen), index=df_origen.index)
+        if nombre_columna:
+            df_out = df_origen.copy()
+            df_out[nombre_columna] = serie_vacia
+            return df_out
+        return serie_vacia
 
     # Mapeo rápido usando diccionario para máxima velocidad
     mapeo = df_destino.drop_duplicates(subset=[target_key]).set_index(target_key)[columna_a_traer].to_dict()
@@ -444,7 +522,9 @@ def conciliar_tablas(
     clave: str,
     columnas_comparar: Optional[List[str]] = None,
     sufijo_a: str = "_A",
-    sufijo_b: str = "_B"
+    sufijo_b: str = "_B",
+    lanzar_error: bool = False,
+    mostrar_feedback: bool = True
 ) -> Dict[str, pd.DataFrame]:
     """
     Concilia y audita dos tablas (ej: sistema vs extracto bancario, o inventario teórico vs físico).
@@ -456,7 +536,17 @@ def conciliar_tablas(
     - 'solo_en_B': Filas que solo existen en la segunda tabla.
     """
     if clave not in df_a.columns or clave not in df_b.columns:
-        raise KeyError(f"La columna clave '{clave}' debe existir en ambas tablas.")
+        msg = f"La columna clave '{clave}' debe existir en ambas tablas. (df_a: {list(df_a.columns)}, df_b: {list(df_b.columns)})"
+        if mostrar_feedback:
+            print(f"⚠️ [conciliar_tablas] {msg}")
+        if lanzar_error:
+            raise KeyError(msg)
+        return {
+            "coincidentes": pd.DataFrame(),
+            "diferencias": pd.DataFrame(),
+            "solo_en_A": df_a.copy() if df_a is not None else pd.DataFrame(),
+            "solo_en_B": df_b.copy() if df_b is not None else pd.DataFrame(),
+        }
 
     # Unir ambas tablas con outer join
     merged = pd.merge(df_a, df_b, on=clave, how='outer', suffixes=(sufijo_a, sufijo_b), indicator=True)

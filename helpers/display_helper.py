@@ -1,7 +1,7 @@
 """
 Módulo helper para visualización limpia en consola de tablas detectadas y DataFrames.
 """
-from typing import List, Any
+from typing import List, Any, Optional, Union
 import sys
 import pandas as pd
 
@@ -115,34 +115,81 @@ class DisplayHelper:
             print("Consejo: Usa el número de 'Fila' para tu parámetro fila_encabezado.\n")
 
     @staticmethod
-    def print_dataframe(df: pd.DataFrame, title: str = "DataFrame Limpio"):
-        """Imprime un DataFrame formateado."""
+    def print_dataframe(
+        df: pd.DataFrame,
+        title: str = "DataFrame Limpio",
+        max_rows: Optional[Union[int, str]] = 15
+    ):
+        """
+        Imprime un DataFrame formateado con estilo Rich.
+
+        Parámetros:
+        -----------
+        df : pd.DataFrame
+            El DataFrame a mostrar.
+        title : str
+            Título de la tabla.
+        max_rows : int, None o 'all' (por defecto 15)
+            Cantidad máxima de filas a renderizar. Usa None o 'all' para mostrar todas las filas.
+        """
+        if df is None or df.empty:
+            if HAS_RICH:
+                console.print(f"[yellow]⚠️ {title}: El DataFrame está vacío o es None.[/yellow]")
+            else:
+                print(f"⚠️ {title}: El DataFrame está vacío o es None.")
+            return
+
+        total_filas = len(df)
+        if max_rows is None or max_rows == "all" or (isinstance(max_rows, int) and max_rows <= 0):
+            df_mostrar = df
+            limite = total_filas
+        else:
+            limite = int(max_rows)
+            df_mostrar = df.head(limite)
+
         if HAS_RICH:
-            table = Table(title=f"✨ {title} (Total: {len(df)} filas x {len(df.columns)} columnas)", show_lines=True)
+            table = Table(
+                title=f"✨ {title} (Mostrando {len(df_mostrar)} de {total_filas} filas x {len(df.columns)} columnas)",
+                show_lines=True
+            )
             for col in df.columns:
                 table.add_column(str(col), style="cyan", justify="left")
-            
-            # Mostrar hasta 10 filas
-            for _, row in df.head(10).iterrows():
+
+            for _, row in df_mostrar.iterrows():
                 table.add_row(*[str(val) if pd.notna(val) else "" for val in row.values])
-            
+
             console.print(table)
-            if len(df) > 10:
-                console.print(f"[dim]... y {len(df) - 10} filas más.[/dim]\n")
+            if total_filas > limite:
+                console.print(f"[dim]... y {total_filas - limite} filas más. (Pasa max_rows=None para ver todas)[/dim]\n")
         else:
-            print(f"\n=== {title} ===")
-            print(df.head(10))
-            print(f"Dimensiones: {df.shape[0]} filas x {df.shape[1]} columnas\n")
+            print(f"\n=== {title} (Mostrando {len(df_mostrar)} de {total_filas} filas) ===")
+            print(df_mostrar)
+            if total_filas > limite:
+                print(f"... y {total_filas - limite} filas más.\n")
 
 
-def mostrar_tabla(df: pd.DataFrame, title: str = "DataFrame", max_rows: int = 15):
+def mostrar_tabla(
+    df: pd.DataFrame,
+    title: str = "DataFrame",
+    max_rows: Optional[Union[int, str]] = 15
+):
     """
     Imprime un DataFrame formateado con bordes y colores en consola usando Rich.
     
-    Ejemplo:
-    --------
-    df = obtener_tabla("facturas.pdf", tabla=1)
-    mostrar_tabla(df, "Mis Facturas")
+    Parámetros:
+    -----------
+    df : pd.DataFrame
+        El DataFrame a visualizar.
+    title : str
+        Título de la tabla.
+    max_rows : int, None o 'all' (por defecto 15)
+        Número de filas a mostrar. Usa max_rows=50, max_rows=None o max_rows='all' para mostrar todas.
+
+    Ejemplos:
+    ---------
+    mostrar_tabla(df, "Mis Facturas", max_rows=30)     # Muestra hasta 30 filas
+    mostrar_tabla(df, "Todas las Facturas", max_rows=None) # Muestra todas las filas sin límite
     """
-    DisplayHelper.print_dataframe(df, title=title)
+    DisplayHelper.print_dataframe(df, title=title, max_rows=max_rows)
+
 
