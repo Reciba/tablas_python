@@ -151,6 +151,7 @@ class TableManager:
         eliminar_filas_vacias: bool = True,
         eliminar_columnas_vacias: bool = True,
         auto_inferir_tipos: bool = True,
+        **kwargs
     ) -> pd.DataFrame:
         """
         Extrae y limpia la tabla deseada devolviendo un pandas DataFrame limpio.
@@ -185,6 +186,11 @@ class TableManager:
         pd.DataFrame
             DataFrame de pandas listo para ser usado.
         """
+        # Soportar alias comunes para evitar errores si el usuario escribe en plural o en inglés
+        for alias in ["fila_encabezados", "header", "header_row", "fila_header"]:
+            if alias in kwargs:
+                fila_encabezado = kwargs.pop(alias)
+
         # Caso especial para SQLite
         if self.ext in ['.db', '.sqlite', '.sqlite3', '.db3']:
             extractor = SQLiteTableExtractor(self.file_path)

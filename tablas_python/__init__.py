@@ -8,7 +8,7 @@ from helpers.table_manager import (
     inspeccionar_archivo,
     exportar_archivo_a_csv,
 )
-from helpers.display_helper import DisplayHelper
+from helpers.display_helper import DisplayHelper, mostrar_tabla
 from utils.exporter import TableExporter, guardar_csv, guardar_excel
 from utils.excel_writer import escribir_en_excel
 from utils.batch_processor import unir_archivos_carpeta
@@ -32,7 +32,7 @@ from utils.data_helpers import (
     conciliar_tablas,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "TableManager",
@@ -40,6 +40,7 @@ __all__ = [
     "inspeccionar_archivo",
     "exportar_archivo_a_csv",
     "DisplayHelper",
+    "mostrar_tabla",
     "TableExporter",
     "guardar_csv",
     "guardar_excel",

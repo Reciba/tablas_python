@@ -3,7 +3,7 @@ Módulo de helpers para gestión, presentación, cálculo y exportación de tabl
 """
 
 from .table_manager import TableManager, obtener_tabla, inspeccionar_archivo, exportar_archivo_a_csv
-from .display_helper import DisplayHelper
+from .display_helper import DisplayHelper, mostrar_tabla
 from utils.batch_processor import unir_archivos_carpeta
 from utils.excel_writer import escribir_en_excel
 from utils.validator import validar_dataframe, reporte_calidad, detectar_duplicados
@@ -24,4 +24,5 @@ __all__ = [
     "obtener_celda",
     "modificar_celda",
     "DisplayHelper",
+    "mostrar_tabla",
 ]

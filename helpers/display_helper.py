@@ -133,3 +133,16 @@ class DisplayHelper:
             print(f"\n=== {title} ===")
             print(df.head(10))
             print(f"Dimensiones: {df.shape[0]} filas x {df.shape[1]} columnas\n")
+
+
+def mostrar_tabla(df: pd.DataFrame, title: str = "DataFrame", max_rows: int = 15):
+    """
+    Imprime un DataFrame formateado con bordes y colores en consola usando Rich.
+    
+    Ejemplo:
+    --------
+    df = obtener_tabla("facturas.pdf", tabla=1)
+    mostrar_tabla(df, "Mis Facturas")
+    """
+    DisplayHelper.print_dataframe(df, title=title)
+
